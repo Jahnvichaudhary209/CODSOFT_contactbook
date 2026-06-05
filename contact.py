@@ -1,200 +1,99 @@
-import sys
+from flask import Flask, render_template, request, jsonify
+import json
+import os
+
+app = Flask(__name__)
+DATA_FILE = 'contacts.json'
+
+def load_contacts():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, 'r') as f:
+            return json.load(f)
+    return []
+
+def save_contacts(contacts):
+    with open(DATA_FILE, 'w') as f:
+        json.dump(contacts, f, indent=2)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/contacts', methods=['GET'])
+def get_contacts():
+    return jsonify(load_contacts())
+
+@app.route('/contacts', methods=['POST'])
+def add_contact():
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    phone = data.get('phone', '').strip()
+    email = data.get('email', '').strip()
+    address = data.get('address', '').strip()
+
+    if not name or not phone:
+        return jsonify({'error': 'Name and phone are required'}), 400
+
+    contacts = load_contacts()
 
 
-def print_header(title):
-    """Helper to keep the UI looking consistent and clean."""
-    print(f"\n{'=' * 40}")
-    print(f" {title.upper()} ".center(40, "-"))
-    print(f"{'=' * 40}")
+    if any(c['phone'] == phone for c in contacts):
+        return jsonify({'error': 'A contact with this phone number already exists'}), 400
 
+    new_contact = {
+        'id': max([c['id'] for c in contacts], default=0) + 1,
+        'name': name,
+        'phone': phone,
+        'email': email,
+        'address': address
+    }
+    contacts.append(new_contact)
+    save_contacts(contacts)
+    return jsonify(new_contact), 201
 
-class ContactBook:
+@app.route('/contacts/<int:contact_id>', methods=['PUT'])
+def update_contact(contact_id):
+    data = request.get_json()
+    contacts = load_contacts()
+    contact = next((c for c in contacts if c['id'] == contact_id), None)
 
-    def __init__(self):
-       
-        self.contacts = []
+    if not contact:
+        return jsonify({'error': 'Contact not found'}), 404
 
-    def add_contact(self):
-        print_header("Add New Contact")
+    name = data.get('name', '').strip()
+    phone = data.get('phone', '').strip()
 
-        name = input("Enter Store Name: ").strip()
-        if not name:
-            print("❌ Store name is required!")
-            return
+    if not name or not phone:
+        return jsonify({'error': 'Name and phone are required'}), 400
 
-        phone = input("Enter Phone Number: ").strip()
-        email = input("Enter Email Address: ").strip()
-        address = input("Enter Physical Address: ").strip()
+   
+    if any(c['phone'] == phone and c['id'] != contact_id for c in contacts):
+        return jsonify({'error': 'Another contact with this phone already exists'}), 400
 
-        
-        new_contact = {
-            "name": name,
-            "phone": phone,
-            "email": email,
-            "address": address,
-        }
+    contact['name']    = name
+    contact['phone']   = phone
+    contact['email']   = data.get('email', '').strip()
+    contact['address'] = data.get('address', '').strip()
+    save_contacts(contacts)
+    return jsonify(contact)
 
-        self.contacts.append(new_contact)
-        print(f"\n✅ Success: '{name}' has been added to your contacts.")
+@app.route('/contacts/<int:contact_id>', methods=['DELETE'])
+def delete_contact(contact_id):
+    contacts = load_contacts()
+    updated = [c for c in contacts if c['id'] != contact_id]
+    if len(updated) == len(contacts):
+        return jsonify({'error': 'Contact not found'}), 404
+    save_contacts(updated)
+    return jsonify({'message': 'Deleted'})
 
-    def view_all_contacts(self):
-        print_header("Saved Contacts")
+@app.route('/search', methods=['GET'])
+def search_contacts():
+    query = request.args.get('q', '').lower().strip()
+    if not query:
+        return jsonify([])
+    contacts = load_contacts()
+    results = [c for c in contacts if query in c['name'].lower() or query in c['phone']]
+    return jsonify(results)
 
-        if not self.contacts:
-            print("Your contact list is currently empty.")
-            return
-
-       
-        for i, contact in enumerate(self.contacts, 1):
-            print(f"{i}. {contact['name']} | Ph: {contact['phone']}")
-
-    def search_contact(self):
-        print_header("Search Contacts")
-
-        if not self.contacts:
-            print("No contacts available to search.")
-            return
-
-        query = input("Enter name or phone number to look up: ").strip().lower()
-
-        if not query:
-            print("Search query cannot be empty.")
-            return
-
-        results = []
-        for contact in self.contacts:
-           
-            if (
-                query in contact["name"].lower()
-                or query in contact["phone"].lower()
-            ):
-                results.append(contact)
-
-       
-        if results:
-            print(f"\nFound {len(results)} matching contact(s):")
-            for contact in results:
-                print("-" * 30)
-                print(f"Store Name : {contact['name']}")
-                print(f"Phone      : {contact['phone']}")
-                print(f"Email      : {contact['email']}")
-                print(f"Address    : {contact['address']}")
-            print("-" * 30)
-        else:
-            print("No matching contacts found.")
-
-    def update_contact(self):
-        print_header("Update Contact Info")
-
-        if not self.contacts:
-            print("No contacts to update.")
-            return
-
-        name_to_find = (
-            input("Enter the exact Store Name you want to update: ")
-            .strip()
-            .lower()
-        )
-
-     
-        target_index = None
-        for i, contact in enumerate(self.contacts):
-            if contact["name"].lower() == name_to_find:
-                target_index = i
-                break
-
-        if target_index is None:
-            print("Contact not found. Make sure the spelling matches exactly.")
-            return
-
-        contact = self.contacts[target_index]
-        print(f"\nFound profile for '{contact['name']}'.")
-        print("Press [Enter] to keep the current value unchanged.\n")
-
-    
-        new_name = input(f"Store Name [{contact['name']}]: ").strip()
-        if new_name:
-            contact["name"] = new_name
-
-        new_phone = input(f"Phone [{contact['phone']}]: ").strip()
-        if new_phone:
-            contact["phone"] = new_phone
-
-        new_email = input(f"Email [{contact['email']}]: ").strip()
-        if new_email:
-            contact["email"] = new_email
-
-        new_address = input(f"Address [{contact['address']}]: ").strip()
-        if new_address:
-            contact["address"] = new_address
-
-        print("\n✅ Contact details successfully updated!")
-
-    def delete_contact(self):
-        print_header("Delete a Contact")
-
-        if not self.contacts:
-            print("No contacts available to delete.")
-            return
-
-        name_to_find = (
-            input("Enter the exact Store Name to delete: ").strip().lower()
-        )
-
-        for i, contact in enumerate(self.contacts):
-            if contact["name"].lower() == name_to_find:
-               
-                confirm = (
-                    input(
-                        f"Are you sure you want to delete '{contact['name']}'? (yes/no): "
-                    )
-                    .strip()
-                    .lower()
-                )
-                if confirm in ["y", "yes"]:
-                    self.contacts.pop(i)
-                    print("\n🗑️ Contact deleted successfully.")
-                else:
-                    print("\nDeletion cancelled.")
-                return
-
-        print("Contact not found.")
-
-
-def main():
-    
-    book = ContactBook()
-
-    while True:
-        print_header("Main Menu")
-        print("1. Add New Contact")
-        print("2. View All Contacts (Names & Phones)")
-        print("3. Search for a Contact")
-        print("4. Update Existing Contact")
-        print("5. Delete a Contact")
-        print("6. Exit Program")
-
-        choice = input("\nSelect an option (1-6): ").strip()
-
-        if choice == "1":
-            book.add_contact()
-        elif choice == "2":
-            book.view_all_contacts()
-        elif choice == "3":
-            book.search_contact()
-        elif choice == "4":
-            book.update_contact()
-        elif choice == "5":
-            book.delete_contact()
-        elif choice == "6":
-            print("\nShutting down. Goodbye!")
-            sys.exit()
-        else:
-            print("\n❌ Invalid choice! Please type a number between 1 and 6.")
-
-       
-        input("\nPress Enter to return to the menu...")
-
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    app.run(debug=True)
