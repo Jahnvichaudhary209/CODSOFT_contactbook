@@ -1,6 +1,6 @@
 # Contact Management System
 
-A lightweight, human-crafted command-line interface (CLI) application built in Python for managing business and retail store contacts. It provides full CRUD functionality (Create, Read, Update, Delete) with a clean and interactive text-based user interface.
+A lightweight, human-crafted command-line interface (CLI) application built in Python for managing business and retail store contacts. It provides full CRUD functionality (Create, Read, Update, Delete) with a clean and interactive text-based user interface. Rune live at : https://sparkling-arithmetic-e5b924.netlify.app/
 
 ## Features
 
