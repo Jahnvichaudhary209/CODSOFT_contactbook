@@ -15,6 +15,8 @@ A lightweight, human-crafted command-line interface (CLI) application built in P
 
 ### Prerequisites
 Make sure you have Python installed on your machine. This script is fully compatible with Python 3.6 and above.
+pip install -r requirements.txt
+python app.py
 
 ### Execution
 1. Save the Python script as `main.py`.
